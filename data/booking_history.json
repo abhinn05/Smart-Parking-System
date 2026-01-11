@@ -1,0 +1,17 @@
+[
+    {
+        "slot": "B2",
+        "vehicle_id": "BQWE123",
+        "booked_at": "2026-01-11T17:55:40.406780",
+        "action": "book",
+        "timestamp": "2026-01-11T17:55:40.408867"
+    },
+    {
+        "slot": "B2",
+        "vehicle_id": "BQWE123",
+        "booked_at": null,
+        "action": "release",
+        "timestamp": "2026-01-11T17:56:06.949835",
+        "released_at": "2026-01-11T17:56:06.949835"
+    }
+]

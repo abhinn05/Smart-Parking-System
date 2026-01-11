@@ -120,6 +120,7 @@ def book_parking_slot(slot, vehicle_id):
         parking_lot[slot]['booked_at'] = datetime.now().isoformat()
         
         if save_parking_data(parking_lot):
+            add_to_history(slot, vehicle_id, "book")
             print(f"\n✓ SUCCESS! Slot {slot} booked for vehicle {vehicle_id}")
             print(f"   Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             return True
@@ -134,6 +135,7 @@ def book_parking_slot(slot, vehicle_id):
         if booked_time:
             print(f"   Booked at: {booked_time[:19]}")
         return False
+
 
 def release_parking_slot(slot):
     """Release an occupied parking slot"""
@@ -160,6 +162,7 @@ def release_parking_slot(slot):
         parking_lot[slot]['booked_at'] = None
         
         if save_parking_data(parking_lot):
+            add_to_history(slot, vehicle, "release")
             print(f"\n✓ SUCCESS! Slot {slot} has been released")
             print(f"   Vehicle: {vehicle}")
             print(f"   Parking duration: {duration_str}")
@@ -240,6 +243,40 @@ def display_statistics():
     
     print("="*50)
 
+HISTORY_FILE = os.path.join('..', 'data', 'booking_history.json')
+
+def load_history():
+    """Load booking history"""
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r') as f:
+            return json.load(f)
+    return []
+
+def save_history(history):
+    """Save booking history"""
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(history, f, indent=4)
+        return True
+    except:
+        return False
+
+def add_to_history(slot, vehicle_id, action):
+    """Add entry to booking history"""
+    history = load_history()
+    entry = {
+        "slot": slot,
+        "vehicle_id": vehicle_id,
+        "booked_at": parking_lot[slot]['booked_at'],
+        "action": action,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    if action == "release":
+        entry["released_at"] = datetime.now().isoformat()
+    
+    history.append(entry)
+    save_history(history)
 # Main program
 if __name__ == "__main__":
     print("\n" + "="*70)
