@@ -1,0 +1,22 @@
+{
+    "A1": {
+        "available": true,
+        "vehicle_id": null,
+        "booked_at": null
+    },
+    "A2": {
+        "available": false,
+        "vehicle_id": "ABCD123",
+        "booked_at": "2026-01-11T17:24:43.514992"
+    },
+    "B1": {
+        "available": true,
+        "vehicle_id": null,
+        "booked_at": null
+    },
+    "B2": {
+        "available": true,
+        "vehicle_id": null,
+        "booked_at": null
+    }
+}

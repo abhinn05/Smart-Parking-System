@@ -17,7 +17,7 @@ def validate_slot(slot):
 def book_parking_slot(slot):
     if not validate_slot(slot):
          print(f"Error: Slot '{slot}' does not exist.")
-    return
+         return
 
     if parking_lot.get(slot):
         parking_lot[slot] = False
