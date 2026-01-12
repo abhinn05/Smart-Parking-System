@@ -64,6 +64,31 @@ class ParkingDatabase:
         conn.commit()
         conn.close()
         return booking_id
+    
+    def get_booking_by_id(self, booking_id: str) -> Optional[Tuple[str, str]]:
+        """Get booking details by booking ID. Returns (slot_id, user_name) or None"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT slot_id, user_name FROM bookings WHERE booking_id = ? AND status = ?',
+            (booking_id, 'ACTIVE')
+        )
+        result = cursor.fetchone()
+        conn.close()
+        return result if result else None
+    
+    def update_booking_status(self, booking_id: str, status: str) -> bool:
+        """Update booking status"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE bookings SET status = ? WHERE booking_id = ?',
+            (status, booking_id)
+        )
+        success = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return success
 
 
 class SmartParkingSystem:
@@ -163,34 +188,45 @@ class SmartParkingSystem:
             booking_id = self.db.create_booking(slot_id, user_name)
             
             print(f"\n✅ SUCCESS! Slot {slot_id} booked for {user_name}")
-            print(f"   Booking ID: {booking_id}")
+            print(f"   📋 Booking ID: {booking_id}")
+            print(f"   ⚠️  IMPORTANT: Save this Booking ID to release your slot later!")
             print(f"   Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             
             return booking_id
     
-    def release_parking_slot(self, slot_id: str):
-        """Release a parking slot (FR-04)"""
-        # Validate input
-        is_valid, result = self.validate_slot(slot_id)
-        if not is_valid:
-            print(f"\n❌ Error: {result}")
+    def release_parking_slot_by_booking_id(self, booking_id: str):
+        """Release a parking slot using booking ID"""
+        # Validate and sanitize input
+        booking_id = booking_id.strip().upper()
+        
+        # Check for SQL injection patterns
+        if any(char in booking_id for char in ["'", '"', ";", "--", "/*"]):
+            print(f"\n❌ Error: Invalid characters in booking ID")
             return
         
-        slot_id = result
+        # Get booking details
+        booking_details = self.db.get_booking_by_id(booking_id)
+        
+        if not booking_details:
+            print(f"\n❌ Error: Booking ID '{booking_id}' not found or already released.")
+            return
+        
+        slot_id, user_name = booking_details
         
         # Acquire lock for this specific slot
         slot_lock = self.get_or_create_lock(slot_id)
         
         with slot_lock:
-            is_available = self.db.get_slot_status(slot_id)
-            
-            if is_available:
-                print(f"\n⚠️  Slot {slot_id} is already available.")
-                return
-            
             # Update slot status to available
             self.db.update_slot_status(slot_id, True)
-            print(f"\n✅ Slot {slot_id} has been released and is now available.")
+            
+            # Update booking status to completed
+            self.db.update_booking_status(booking_id, 'COMPLETED')
+            
+            print(f"\n✅ Slot {slot_id} has been released successfully!")
+            print(f"   User: {user_name}")
+            print(f"   Booking ID: {booking_id}")
+            print(f"   Released at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def main():
@@ -219,8 +255,8 @@ def main():
             input("\nPress Enter to continue...")
             
         elif choice == "2":
-            slot = input("Enter slot ID to release (e.g., A1): ").strip().upper()
-            system.release_parking_slot(slot)
+            booking_id = input("Enter your Booking ID to release the slot: ").strip().upper()
+            system.release_parking_slot_by_booking_id(booking_id)
             input("\nPress Enter to continue...")
             
         elif choice == "3":
