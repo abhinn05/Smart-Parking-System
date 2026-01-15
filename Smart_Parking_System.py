@@ -153,6 +153,27 @@ class SmartParkingSystem:
         
         print("="*50)
     
+    def display_available_slots(self):
+        """Display only available parking slots"""
+        slots = self.db.get_all_slots()
+        available_slots = [slot_id for slot_id, is_available in sorted(slots.items()) if is_available]
+        
+        if not available_slots:
+            print("\n❌ Sorry! All slots are currently occupied.")
+            return available_slots
+        
+        GREEN = '\033[92m'
+        RESET = '\033[0m'
+        BOLD = '\033[1m'
+        
+        print(f"\n{GREEN}{BOLD}✅ AVAILABLE SLOTS:{RESET}")
+        print("─" * 40)
+        for slot_id in available_slots:
+            print(f"  {GREEN}●{RESET} {BOLD}{slot_id}{RESET}")
+        print("─" * 40)
+        
+        return available_slots
+    
     def validate_slot(self, slot_id: str) -> Tuple[bool, str]:
         """Validate slot input (NFR-R2)"""
         # Input sanitization
@@ -263,9 +284,48 @@ def main():
         choice = input("\nEnter your choice (1-4): ").strip()
         
         if choice == "1":
-            slot = input("Enter slot ID to book (e.g., A1): ").strip().upper()
-            user = input("Enter your name (optional, press Enter for 'Guest'): ").strip() or "Guest"
-            system.book_parking_slot(slot, user)
+            booking_complete = False
+            
+            while not booking_complete:
+                slot = input("Enter slot ID to book (e.g., A1): ").strip().upper()
+                
+                # First, validate and check if slot is available
+                is_valid, result = system.validate_slot(slot)
+                if not is_valid:
+                    print(f"\n❌ Error: {result}")
+                    retry = input("Do you want to try again? (yes/no): ").strip().lower()
+                    if retry not in ['yes', 'y']:
+                        break
+                    continue
+                
+                slot = result
+                is_available = system.db.get_slot_status(slot)
+                if not is_available:
+                    print(f"\n❌ Slot {slot} is already occupied. Please choose another slot.")
+                    
+                    # Show available slots
+                    available_slots = system.display_available_slots()
+                    
+                    if available_slots:
+                        want_to_book = input("\n🔍 Would you like to book one of the available slots above? (yes/no): ").strip().lower()
+                        if want_to_book in ['yes', 'y']:
+                            booking_complete = False  # Continue in loop to select new slot
+                            continue
+                        else:
+                            break
+                    else:
+                        break
+                else:
+                    # Only ask for name if slot is available
+                    user = input("Enter your name (optional, press Enter for 'Guest'): ").strip() or "Guest"
+                    booking_result = system.book_parking_slot(slot, user)
+                    if booking_result:
+                        booking_complete = True
+                    else:
+                        retry = input("Do you want to try again? (yes/no): ").strip().lower()
+                        if retry not in ['yes', 'y']:
+                            break
+            
             input("\nPress Enter to continue...")
             
         elif choice == "2":
