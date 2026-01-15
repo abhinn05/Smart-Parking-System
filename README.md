@@ -75,7 +75,7 @@ A robust, real-time parking management web application built with **Streamlit**,
 ```text
 .
 ├── app.py                   # Main Streamlit web application
-├── smart_parking_system.py  # Core logic and Database management
+├── Smart_Parking_System.py  # Core logic and Database management
 ├── parking.db               # SQLite Database (Auto-generated)
 └── README.md                # Project documentation
 ```
