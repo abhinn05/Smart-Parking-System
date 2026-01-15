@@ -2,101 +2,71 @@ import unittest
 import os
 import sqlite3
 import threading
-import time
 from complete_code import SmartParkingSystem, ParkingDatabase
 
-class TestSmartParkingSystem(unittest.TestCase):   
+class TestSmartParkingFullSystem(unittest.TestCase):
+    
     @classmethod
     def setUpClass(cls):
-        """Create a dummy database for testing"""
-        cls.test_db = "test_parking.db"  
+        cls.test_db = "full_system_test.db"
         if os.path.exists(cls.test_db):
             os.remove(cls.test_db)
             
         conn = sqlite3.connect(cls.test_db)
         cursor = conn.cursor()
+        cursor.execute('CREATE TABLE slots (slot_id TEXT PRIMARY KEY, is_available INTEGER, last_updated DATETIME)')
+        cursor.execute('CREATE TABLE bookings (booking_id TEXT PRIMARY KEY, slot_id TEXT, user_name TEXT, booking_time DATETIME, status TEXT)')
         
-        cursor.execute('''
-            CREATE TABLE slots (
-                slot_id TEXT PRIMARY KEY,
-                is_available INTEGER,
-                last_updated DATETIME
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE bookings (
-                booking_id TEXT PRIMARY KEY,
-                slot_id TEXT,
-                user_name TEXT,
-                booking_time DATETIME,
-                status TEXT
-            )
-        ''')
-        
-        cursor.execute("INSERT INTO slots VALUES ('A1', 1, '2023-01-01')")
-        cursor.execute("INSERT INTO slots VALUES ('A2', 1, '2023-01-01')")
+        cls.all_slots = []
+        for row in ['A', 'B', 'C']:
+            for num in ['1', '2', '3']:
+                sid = f"{row}{num}"
+                cls.all_slots.append(sid)
+                cursor.execute("INSERT INTO slots (slot_id, is_available) VALUES (?, 1)", (sid,))
         conn.commit()
         conn.close()
 
-    def setUp(self):
-        """Initialize system pointing to test database""" 
-        self.system = SmartParkingSystem()
-        self.system.db = ParkingDatabase(db_path=self.test_db)
+        cls.system = SmartParkingSystem()
+        cls.system.db = ParkingDatabase(db_path=cls.test_db)
+        cls.booking_registry = {}
 
-    def test_booking_success(self):
-        """Test basic successful booking (FR-02)"""
-        booking_id = self.system.book_parking_slot("A1", "Alice")
-        self.assertIsNotNone(booking_id)
-        self.assertFalse(self.system.db.get_slot_status("A1"))
+    def test_01_mass_booking_all_slots(self):
+        for slot in self.all_slots:
+            bid = self.system.book_parking_slot(slot, f"User_{slot}")
+            self.assertIsNotNone(bid, f"Failed to book available slot {slot}")
+            self.__class__.booking_registry[slot] = bid
+            self.assertFalse(self.system.db.get_slot_status(slot))
 
-    def test_double_booking_prevention(self):
-        """Test that an occupied slot cannot be booked (FR-03)"""
-        self.system.book_parking_slot("A2", "Bob")
-        second_booking = self.system.book_parking_slot("A2", "Charlie")
-        self.assertIsNone(second_booking)
+    def test_02_double_booking_edge_case(self):
+        for slot in self.all_slots:
+            second_attempt = self.system.book_parking_slot(slot, "Intruder")
+            self.assertIsNone(second_attempt, f"System allowed double booking on {slot}!")
 
-    def test_release_slot(self):
-        """Test releasing a slot via booking ID (FR-05)"""
-        self.system.db.update_slot_status("A1", True)      
-        booking_id = self.system.book_parking_slot("A1", "Alice")    
-        self.assertIsNotNone(booking_id, "Booking failed, returned None")     
-        self.system.release_parking_slot_by_booking_id(booking_id)
-        self.assertTrue(self.system.db.get_slot_status("A1"))
+    def test_03_invalid_inputs_edge_case(self):
+        injections = ["' OR 1=1 --", "D1", "A4", " ", "A1; DROP TABLE slots;"]
+        for bad_input in injections:
+            res = self.system.book_parking_slot(bad_input)
+            self.assertIsNone(res, f"System failed to reject malicious/invalid input: {bad_input}")
 
-    def test_invalid_slot_validation(self):
-        """Test validation for non-existent slots (NFR-R2)"""
-        is_valid, msg = self.system.validate_slot("Z99")
-        self.assertFalse(is_valid)
-        self.assertIn("does not exist", msg)
+    def test_04_partial_release_and_verify(self):
+        b_slots = ['B1', 'B2', 'B3']
+        for slot in b_slots:
+            bid = self.__class__.booking_registry[slot]
+            self.system.release_parking_slot_by_booking_id(bid)
+            self.assertTrue(self.system.db.get_slot_status(slot))
 
-    def test_concurrency_race_condition(self):
-        """Test high-concurrency: multiple threads trying to book the same slot"""
-        results = []
-        slot_to_book = "A2"
-        self.system.db.update_slot_status(slot_to_book, True)
+        for slot in ['A1', 'A2', 'A3', 'C1', 'C2', 'C3']:
+            self.assertFalse(self.system.db.get_slot_status(slot), f"Slot {slot} was freed unexpectedly!")
 
-        def attempt_booking():
-            res = self.system.book_parking_slot(slot_to_book, "ThreadUser")
-            if res:
-                results.append(res)
-
-        threads = []
-        for _ in range(10): 
-            t = threading.Thread(target=attempt_booking)
-            threads.append(t)
-            t.start()
-
-        for t in threads:
-            t.join()
-
-        self.assertEqual(len(results), 1, "Concurrency Error: Multiple users booked the same slot!")
+    def test_05_case_sensitivity_release(self):
+        a1_bid = self.__class__.booking_registry['A1'].lower()
+        self.system.release_parking_slot_by_booking_id(a1_bid)
+        self.assertTrue(self.system.db.get_slot_status('A1'))
 
     @classmethod
     def tearDownClass(cls):
-        """Clean up the test database file"""
         if os.path.exists(cls.test_db):
             os.remove(cls.test_db)
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(failfast=True)
