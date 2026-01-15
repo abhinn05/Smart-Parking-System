@@ -90,6 +90,20 @@ class ParkingDatabase:
         conn.close()
         return success
 
+    def release_all_slots(self) -> bool:
+        """Resets all slots to available and marks all active bookings as COMPLETED"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute('UPDATE slots SET is_available = 1, last_updated = ?', (datetime.now(),))
+            cursor.execute('UPDATE bookings SET status = ? WHERE status = ?', ('COMPLETED', 'ACTIVE'))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error resetting database: {e}")
+            return False
+        finally:
+            conn.close()
 
 class SmartParkingSystem:
     """Main parking system with concurrency control"""
