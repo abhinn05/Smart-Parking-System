@@ -5,19 +5,17 @@ import threading
 import time
 from complete_code import SmartParkingSystem, ParkingDatabase
 
-class TestSmartParkingSystem(unittest.TestCase):
-    
+class TestSmartParkingSystem(unittest.TestCase):   
     @classmethod
     def setUpClass(cls):
         """Create a dummy database for testing"""
-        cls.test_db = "test_parking.db"
-        # Ensure a clean start
+        cls.test_db = "test_parking.db"  
         if os.path.exists(cls.test_db):
             os.remove(cls.test_db)
             
         conn = sqlite3.connect(cls.test_db)
         cursor = conn.cursor()
-        # Create slots table
+        
         cursor.execute('''
             CREATE TABLE slots (
                 slot_id TEXT PRIMARY KEY,
@@ -25,7 +23,7 @@ class TestSmartParkingSystem(unittest.TestCase):
                 last_updated DATETIME
             )
         ''')
-        # Create bookings table
+        
         cursor.execute('''
             CREATE TABLE bookings (
                 booking_id TEXT PRIMARY KEY,
@@ -35,15 +33,14 @@ class TestSmartParkingSystem(unittest.TestCase):
                 status TEXT
             )
         ''')
-        # Insert test slots
+        
         cursor.execute("INSERT INTO slots VALUES ('A1', 1, '2023-01-01')")
         cursor.execute("INSERT INTO slots VALUES ('A2', 1, '2023-01-01')")
         conn.commit()
         conn.close()
 
     def setUp(self):
-        """Initialize system pointing to test database"""
-        # Monkey-patch the database path for testing
+        """Initialize system pointing to test database""" 
         self.system = SmartParkingSystem()
         self.system.db = ParkingDatabase(db_path=self.test_db)
 
@@ -55,15 +52,15 @@ class TestSmartParkingSystem(unittest.TestCase):
 
     def test_double_booking_prevention(self):
         """Test that an occupied slot cannot be booked (FR-03)"""
-        # First booking
         self.system.book_parking_slot("A2", "Bob")
-        # Second booking attempt on same slot
         second_booking = self.system.book_parking_slot("A2", "Charlie")
         self.assertIsNone(second_booking)
 
     def test_release_slot(self):
         """Test releasing a slot via booking ID (FR-05)"""
-        booking_id = self.system.book_parking_slot("A1", "Alice")
+        self.system.db.update_slot_status("A1", True)      
+        booking_id = self.system.book_parking_slot("A1", "Alice")    
+        self.assertIsNotNone(booking_id, "Booking failed, returned None")     
         self.system.release_parking_slot_by_booking_id(booking_id)
         self.assertTrue(self.system.db.get_slot_status("A1"))
 
@@ -77,8 +74,6 @@ class TestSmartParkingSystem(unittest.TestCase):
         """Test high-concurrency: multiple threads trying to book the same slot"""
         results = []
         slot_to_book = "A2"
-        
-        # Ensure slot is available first
         self.system.db.update_slot_status(slot_to_book, True)
 
         def attempt_booking():
@@ -87,7 +82,7 @@ class TestSmartParkingSystem(unittest.TestCase):
                 results.append(res)
 
         threads = []
-        for _ in range(10): # 10 threads racing for 1 slot
+        for _ in range(10): 
             t = threading.Thread(target=attempt_booking)
             threads.append(t)
             t.start()
@@ -95,7 +90,6 @@ class TestSmartParkingSystem(unittest.TestCase):
         for t in threads:
             t.join()
 
-        # Only one thread should have succeeded in booking the slot
         self.assertEqual(len(results), 1, "Concurrency Error: Multiple users booked the same slot!")
 
     @classmethod
