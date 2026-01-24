@@ -1,8 +1,7 @@
 import unittest
 import os
 import sqlite3
-import threading
-from Smart_Parking_System import SmartParkingSystem, ParkingDatabase
+from smart_parking import SmartParkingSystem, ParkingDatabase
 
 class TestSmartParkingFullSystem(unittest.TestCase):
     
